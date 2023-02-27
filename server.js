@@ -1,7 +1,15 @@
 const express = require("express");
 const IP = require("ip");
+const { timers, globalTimerClearer } = require("./src/services/common/helpers/index");
+const fs = require("fs");
+const path = require("path");
+const decache = require("decache");
 
 const app = express();
+
+require("./src/services/service1/server.js");
+require("./src/services/service2/server.js");
+
 
 app.use("/auth", async (req, res) => {
   const ipAddress = IP.address();
@@ -18,7 +26,11 @@ app.use("/auth", async (req, res) => {
   console.log(validAccess[1]);
 
   console.log(req.socket.remoteAddress);
-  if (req.socket.remoteAddress === "::1" || req.ip === "::ffff:127.0.0.1" || req.ip === "127.0.0.1") {
+  if (
+    req.socket.remoteAddress === "::1" ||
+    req.ip === "::ffff:127.0.0.1" ||
+    req.ip === "127.0.0.1"
+  ) {
     res.json({
       msg: "Valid IP",
     });
@@ -30,31 +42,52 @@ app.use("/auth", async (req, res) => {
 });
 
 app.get("/reset", async (req, res) => {
-  // ----------------------- DELETE SERVICE 1 cache ----------------------------------
-  const cachePaths = Object(require.cache)
-  delete require.cache[require.resolve("./src/services/service1/")];
+  let files = getAllJSFiles(
+    "/home/anayak/Desktop/node-projects/learning/allinOne/src/services/service1"
+  );
 
-  // console.log(cachePaths[])
-  // const dddd = delete cachePaths['./src/services/service1/'];
-  // const cachePaths = Object(require.cache)
-  // console.log(cachePaths)
-  // console.log('Cache data was::::::::::::::::')
+  function getAllJSFiles(dirPath, arrayOfFiles) {
+    let files = fs.readdirSync(dirPath);
+    arrayOfFiles = arrayOfFiles || [];
 
-  console.log('----------------------- DELETE SERVICE 1 cache ---------------------------------')
-  
-  // -----------------------  Require SERVICE 1 -----------------------------
-  require('./src/services/service1/server.js');
+    files.forEach(function (file) {
+      if (fs.statSync(dirPath + "/" + file).isDirectory()) {
+        arrayOfFiles = getAllJSFiles(dirPath + "/" + file, arrayOfFiles);
+      } else {
+        if (path.extname(file) === ".js") {
+          arrayOfFiles.push(path.join(dirPath, "/", file));
+        }
+      }
+    });
+    console.log(arrayOfFiles);
+    return arrayOfFiles;
+  }
 
+  const intervalIds = [];
 
-  console.log(' -----------------------  Require SERVICE 1 -----------------------------')
-
-
-  // const Service1 = require('./src/services/service1/server.js')
-
+  for (let i = 0; i < files.length; i++) {
+    var finalArr = [];
+    fs.readFile(files[i], "utf8", function (err, contents) {
+      if (err) throw err;
+      const regex = /setInterval\s*\(/g;
+      let match;
+      while ((match = regex.exec(contents))) {
+        const line = contents.substring(0, match.index).split("\n").length;
+        console.log(files[i], ":::::::::::::::", line);
+        const intervalId = setInterval(function () {   
+        }, 1000);
+        clearInterval(intervalId)
+        console.log(intervalId);
+        finalArr.push(intervalId);
+      }
+    });
+    decache(files[i]);
+    require(files[i]);
+  }
+  console.log("Outside", intervalIds);
   res.json({
-    serviceName: 'service1',
-    // deleteCacheStatus: dddd,
-  })
+    serviceName: "service1",
+  });
 });
 
 app.get("/details", (req, res) => {
@@ -100,12 +133,65 @@ app.get("/details", (req, res) => {
   });
 });
 
+app.get('/service_reload/:servicename', (req, res) => {
+  const servicename = req.params['servicename']
+  const intervalCount = timers.get(servicename).intervals.length
+  const timeoutCount = timers.get(servicename).timeouts.length
+  if(timers.get(servicename).intervals.length > 0){
+    globalTimerClearer(timers.get(servicename).intervals, 'interval')
+  }
+  if(timers.get(servicename).timeouts.length > 0){
+    globalTimerClearer(timers.get(servicename).timeouts, 'timeout')
+  }
+  
+  res.json({
+    success: true,
+    msg: `Interval cleared for ${servicename}`,
+    data : {
+      intervalCount : intervalCount,
+      timeoutCount : timeoutCount
+    }
+  })
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 app.listen(6060, () => {
   console.log(
     ":::::::::::::::::::::: App listening on 6060 :::::::::::::::::::::::::"
   );
 });
 
+// setInterval(() => {
+//   console.log('Iam running every 15 seconds from serverJs file', Math.floor(Math.random() * 100));
+//   console.log(intervals)
+// }, 15000)
 
-
-
+// let timerFUnction = (sName) => {
+//   let id = setInterval(() => {
+//     console.log('Iam running every 15 seconds from serverJs file', Math.floor(Math.random() * 100));
+//     console.log(intervals)
+//   }, 15000);
+//   console.log(`${sName} created setInterval with id ${id}`);
+// }
