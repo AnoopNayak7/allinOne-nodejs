@@ -1,5 +1,5 @@
 let timers = new Map()
-let services = ['service1', 'service2']
+let services = ['service1', 'service2', 'service3']
 for(let i=0; i< services.length; i++){
     timers.set(services[i], {
         intervals: [],
